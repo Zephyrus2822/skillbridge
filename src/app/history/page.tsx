@@ -24,7 +24,8 @@ export default function HistoryPage() {
       try {
         const res = await fetch(`/api/get-history?userId=${user.id}`);
         const data = await res.json();
-        setResumes(data);
+        console.log('[📄 History Data]', data);
+        setResumes(data || []);
       } catch (error) {
         console.error('Error fetching history:', error);
       } finally {

@@ -8,6 +8,8 @@ import fitz  # PyMuPDF
 import spacy
 import os
 from dotenv import load_dotenv
+from bson import ObjectId
+from bson import Binary
 # Start server using uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 load_dotenv()  # Load MONGO_URI from .env
@@ -53,21 +55,29 @@ async def parse_resume(file: UploadFile = File(...), userId: str = Form(...)):
     skills = [ent.text for ent in doc.ents if ent.label_ in ['SKILL', 'ORG', 'PERSON']]
     summary = text[:1000]
 
-    # Insert into MongoDB
-    collection.insert_one({
+    # Prepare the document
+    resume_data = {
         "userId": userId,
         "filename": file.filename,
+        "file_data": Binary(content),  # Store the binary data
         "parsedText": text,
         "summary": summary,
         "skills": list(set(skills)),
-        "uploadedAt": datetime.utcnow()
-    })
+        "uploadedAt": datetime.now()
+    }
+
+    # Log it
+    print(f"[📥 MONGO INSERT] Resume data being saved:\n{resume_data}")
+
+    # Insert into MongoDB
+    collection.insert_one(resume_data)
 
     return {
         "filename": file.filename,
         "summary": summary,
         "skills": list(set(skills))
     }
+
 
 @app.get("/api/download-resume/{resume_id}")
 def download_resume(resume_id: str):
