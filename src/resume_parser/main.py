@@ -61,7 +61,7 @@ async def parse_resume(file: UploadFile = File(...), userId: str = Form(...)):
     text = extract_text(content)
     doc = GlobalState.nlp(text)
     skills = [ent.text for ent in doc.ents if ent.label_ in ['SKILL', 'ORG', 'PERSON']]
-    summary = text[:1000]
+    summary = text[:]
 
     resume_doc = {
         "userId": userId,

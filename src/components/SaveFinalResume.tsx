@@ -12,31 +12,39 @@ export default function SaveFinalResume({ resumeText }: SaveFinalResumeProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const handleSave = async () => {
-  
+const handleSave = async () => {
+  setSaving(true);
+  try {
+    console.log('[💾 SAVE] Sending userId:', user?.id);
 
-    setSaving(true);
-    try {
-      const res = await fetch('/api/db-push', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          // userId: user.id,
-          finalResume: resumeText,
-        }),
-      });
+    const res = await fetch('/api/save-resume', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: user?.id,
+        resumeText,
+      }),
+    });
 
-      if (!res.ok) throw new Error('Save failed');
-      setSaved(true);
-    } catch (err) {
-      console.error('Error saving resume:', err);
-      alert('Failed to save resume.');
-    } finally {
-      setSaving(false);
+    if (!res.ok) {
+      const error = await res.text();
+      console.error('Error saving resume:', error);
+      throw new Error('Save failed');
     }
-  };
+
+    const data = await res.json();
+    console.log('[✅ SAVE RESPONSE]', data);
+    setSaved(true);
+  } catch (error) {
+    console.error('Save failed:', error);
+    alert('Failed to save resume. Check console.');
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   return (
     <div className="mt-6 text-center">
