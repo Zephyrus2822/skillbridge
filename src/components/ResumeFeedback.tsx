@@ -16,27 +16,31 @@ export default function ResumeFeedback({
   onRate,
 }: ResumeFeedbackProps) {
   const { user } = useUser();
-  const [generatedFeedback, setGeneratedFeedback] = useState<string>(feedback);
+  const [generatedFeedback, setGeneratedFeedback] = useState<string>(
+  typeof feedback === 'string' ? feedback : (feedback as any)?.content || ''
+);
   const [loading, setLoading] = useState<boolean>(false);
   const [rated, setRated] = useState<boolean>(false);
 
-  const fetchFeedback = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/dashboard/api/get-feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user?.id, resumeText }),
-      });
+//   const fetchFeedback = async () => {
+//     setLoading(true);
+//     try {
+//       const res = await fetch('http://localhost:8000/api/get-feedback', {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({ userId: user?.id, resumeText }),
+//       });
 
-      const data = await res.json();
-      setGeneratedFeedback(data.feedback || data.text);
-    } catch (err) {
-      console.error('Failed to fetch feedback:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+//       const data = await res.json();
+//       setGeneratedFeedback(
+//   typeof data.feedback === 'string' ? data.feedback : data.feedback?.content || 'No feedback available.'
+// );
+  //   } catch (err) {
+  //     console.error('Failed to fetch feedback:', err);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const rate = async (thumb: 'up' | 'down') => {
     try {
@@ -56,12 +60,12 @@ export default function ResumeFeedback({
     }
   };
 
-  useEffect(() => {
-    if (resumeText) {
-      fetchFeedback();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resumeText]);
+  // useEffect(() => {
+  //   if (resumeText) {
+  //     fetchFeedback();
+  //   }
+    
+  // }, [resumeText]);
 
   return (
     <div className="mt-6 bg-white p-6 rounded-lg shadow">

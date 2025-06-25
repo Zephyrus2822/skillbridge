@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useUser } from '@clerk/nextjs';
 import FileUploader from '@/components/FileUploader';
 import ResumeFeedback from '@/components/ResumeFeedback';
 import ResumeEditor from '@/components/ResumeEditor';
 import SaveFinalResume from '@/components/SaveFinalResume';
 
 export default function DashboardPage() {
+  const { user } = useUser();
   const [resumeText, setResumeText] = useState<string>('');
   const [feedback, setFeedback] = useState<string>('');
   const [showEditor, setShowEditor] = useState<boolean>(false);
@@ -19,14 +21,34 @@ export default function DashboardPage() {
   onParsed={async (parsedText: string) => {
     setResumeText(parsedText);
 
-    const res = await fetch('/api/get-feedback', {
+     const payload = {
+      resumeText: parsedText,
+      // userId: user?.id || "anonymous"
+    };
+
+    console.log("[📤 FRONTEND] Payload to /get-feedback:", payload); // 🔍 Log it
+   
+    
+    const res = await fetch('http://localhost:8000/api/get-feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resumeText: parsedText }), // fix here
+      body: JSON.stringify({
+
+       userId: user?.id,  
+      resumeText: parsedText,  
+     
+  }),
     });
 
     const data = await res.json();
-    setFeedback(data.feedback || data.text);
+     console.log("[📥 FRONTEND] Response from /get-feedback:", data); // 🔍 Response
+    const extractedFeedback = typeof data.feedback === "object" && data.feedback.content
+    ? data.feedback.content
+    : data.feedback;
+
+  console.log("[🧪 Extracted Feedback]", extractedFeedback);
+
+  setFeedback(extractedFeedback);
   }}
 />
 

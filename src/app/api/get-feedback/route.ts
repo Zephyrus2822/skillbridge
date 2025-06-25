@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { userId, resumeText } = body;
 
-    const response = await fetch("http://0.0.0.0:8000/api/get-feedback", {
+    const response = await fetch("http://localhost:8000/api/get-feedback", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, resumeText }),

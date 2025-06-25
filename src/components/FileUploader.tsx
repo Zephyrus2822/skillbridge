@@ -40,7 +40,8 @@ export default function FileUploader({onParsed}: {onParsed: FileUploaderProps['o
 
       const result = await res.json();
       setSuccess(true);
-      onParsed(result.parsedText);
+      onParsed(result.summary);
+      console.log("[📦 Upload Response]", result);
     } catch (err) {
       console.error('Upload error:', err);
       alert('Something went wrong while uploading the resume.');

@@ -13,7 +13,7 @@ export default function SaveFinalResume({ resumeText }: SaveFinalResumeProps) {
   const [saved, setSaved] = useState(false);
 
   const handleSave = async () => {
-    if (!user?.id) return;
+  
 
     setSaving(true);
     try {
@@ -23,7 +23,7 @@ export default function SaveFinalResume({ resumeText }: SaveFinalResumeProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: user.id,
+          // userId: user.id,
           finalResume: resumeText,
         }),
       });

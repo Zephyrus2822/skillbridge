@@ -93,8 +93,10 @@ def store_feedback_vector(user_id: str, resume_text: str, feedback: str):
 # ----------------- FASTAPI ROUTE -----------------
 @router.post("/api/get-feedback")
 async def generate_feedback(payload: dict):
+    print("[📥 BACKEND] Received payload:", payload)
+
     resume_text = payload.get("resumeText")
-    user_id = payload.get("userId")
+    # user_id = payload.get("userId", "anonymous")  
 
     if not resume_text:
         raise HTTPException(status_code=400, detail="Missing resume text")
@@ -102,12 +104,16 @@ async def generate_feedback(payload: dict):
     try:
         print("[🤖 AGENT] Generating feedback")
         agent = build_feedback_agent()
-        feedback = agent.invoke({"resume_text": resume_text})  # invoke preferred
+        feedback = agent.invoke({"resume_text": resume_text})
 
-        print("[✅ AGENT] Feedback generated successfully.")
-        store_feedback_vector(user_id, resume_text, feedback)
+        # Store feedback only if user is authenticated
+        # if user_id != "anonymous":
+        #     store_feedback_vector(user_id, resume_text, feedback)
+        # else:
+        #     print("[ℹ️] Skipping DB store for anonymous user")
 
+        print("[✅ BACKEND] Returning feedback:", feedback)
         return {"feedback": feedback}
     except Exception as e:
-        print(f"[❌] Feedback generation failed: {str(e)}")
+        print(f"[❌ AGENT ERROR] {str(e)}")
         raise HTTPException(status_code=500, detail="Agent error")
