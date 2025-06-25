@@ -3,12 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, resumeText } = body;
+    const { userId, resumeText, feedback, timestamp } = body;
 
     const response = await fetch("http://localhost:8000/api/get-feedback", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, resumeText }),
+      body: JSON.stringify({ userId, resumeText, feedback, timestamp }),
     });
 
     if (!response.ok) {

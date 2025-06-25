@@ -2,81 +2,96 @@
 
 import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
-import FileUploader from '@/components/FileUploader';
+import FileUploader, { ResumeEntry } from '@/components/FileUploader';
 import ResumeFeedback from '@/components/ResumeFeedback';
 import ResumeEditor from '@/components/ResumeEditor';
 import SaveFinalResume from '@/components/SaveFinalResume';
+import ResumeRewrite from '@/components/ResumeRewrite';
 
 export default function DashboardPage() {
   const { user, isSignedIn } = useUser();
-  const [resumeText, setResumeText] = useState<string>('');
-  const [feedback, setFeedback] = useState<string>('');
+
+  const [resumeList, setResumeList] = useState<ResumeEntry[]>([]);
+  const [activeResumeId, setActiveResumeId] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState<boolean>(false);
+  const [showRewrite, setShowRewrite] = useState(false);
 
-  // if(isSignedIn) { console.log(user.id); }
+  const activeResume = resumeList.find(r => r.id === activeResumeId);
+
   useEffect(() => {
-  if (user) {
-    console.log("[🔐 USER INFO]", user?.id, isSignedIn);
-  }
-}, [user]);
+    if (user) {
+      console.log('[🔐 USER INFO]', user?.id, isSignedIn);
+    }
+  }, [user, isSignedIn]);
 
-
-  return (
-    <div className="p-4 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Welcome to your Dashboard!</h1>
-
-     <FileUploader
-  onParsed={async (parsedText: string) => {
-    setResumeText(parsedText);
-
-     const payload = {
-      resumeText: parsedText,
-      userId: user?.id || "anonymous"
-    };
-
-    // console.log("[📤 FRONTEND] Payload to /get-feedback:", payload); 
-   
-    
+  const handleParsed = async (resume: ResumeEntry) => {
     const res = await fetch('http://localhost:8000/api/get-feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-
-       userId: user?.id,  
-      resumeText: parsedText,  
-     
-  }),
+        userId: user?.id || 'anonymous',
+        resumeText: resume.originalText,
+      }),
     });
 
     const data = await res.json();
-    //  console.log("[📥 FRONTEND] Response from /get-feedback:", data); // 🔍 Response
-    const extractedFeedback = typeof data.feedback === "object" && data.feedback.content
-    ? data.feedback.content
-    : data.feedback;
+    const extractedFeedback =
+      typeof data.feedback === 'object' && data.feedback.content
+        ? data.feedback.content
+        : data.feedback;
 
-  // console.log("[🧪 Extracted Feedback]", extractedFeedback);
+    const resumeWithFeedback: ResumeEntry = {
+      ...resume,
+      feedback: extractedFeedback,
+    };
 
-  setFeedback(extractedFeedback);
-  }}
-/>
+    setResumeList(prev => [...prev, resumeWithFeedback]);
+    setActiveResumeId(resumeWithFeedback.id);
+    setShowEditor(false);
+  };
 
+  const handleRate = (rating: 'up' | 'down') => {
+    setShowEditor(true);
+    if (rating === 'down') setShowRewrite(true);
+  };
 
-      {feedback && (
+  const handleEditUpdate = (editedText: string) => {
+    if (!activeResume) return;
+    const updated = resumeList.map(r =>
+      r.id === activeResume.id ? { ...r, editedText } : r
+    );
+    setResumeList(updated);
+  };
+
+  return (
+    <div className="p-4 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">📂 SkillBridge Dashboard</h1>
+
+      <FileUploader onParsed={handleParsed} />
+
+      {activeResume && activeResume.feedback && (
         <ResumeFeedback
-          feedback={feedback}
-          resumeText={resumeText}
-          onRate={() => setShowEditor(true)}
+          feedback={activeResume.feedback}
+          resumeText={activeResume.originalText}
+          onRate={handleRate}
         />
       )}
 
-      {showEditor && (
-        <ResumeEditor
-          initialText={resumeText}
-          onUpdate={(updated) => setResumeText(updated)}
-        />
+      {showEditor && activeResume && (
+        <>
+          <ResumeEditor
+            initialText={activeResume.editedText || activeResume.originalText}
+            onUpdate={handleEditUpdate}
+          />
+          <SaveFinalResume
+            resumeText={activeResume.editedText || activeResume.originalText}
+          />
+        </>
       )}
 
-      {showEditor && <SaveFinalResume resumeText={resumeText} />}
+      {showRewrite && activeResume && (
+        <ResumeRewrite originalResume={activeResume.originalText} />
+      )}
     </div>
   );
 }

@@ -2,22 +2,32 @@
 
 import { useDropzone } from 'react-dropzone';
 import { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
 
 interface FileUploaderProps {
-  onParsed: (resumeText: string) => void;
+  onParsed: (resume: ResumeEntry) => void;
 }
 
-export default function FileUploader({onParsed}: {onParsed: FileUploaderProps['onParsed']}) {
+export interface ResumeEntry {
+  id: string;
+  originalText: string;
+  feedback: string;
+  editedText?: string;
+  rating?: 'up' | 'down';
+  aiVersion?: boolean;
+  createdAt?: string;
+}
+
+export default function FileUploader({ onParsed }: FileUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
 
-  const onDrop = useCallback(async(acceptedFiles: File[]) => {
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
 
     if (!file || file.type !== 'application/pdf') {
-      alert("Please upload a valid PDF file.");
+      setError('Please upload a valid PDF file.');
       return;
     }
 
@@ -27,6 +37,7 @@ export default function FileUploader({onParsed}: {onParsed: FileUploaderProps['o
     try {
       setUploading(true);
       setSuccess(false);
+      setError(null);
 
       const res = await fetch('/api/upload-resume', {
         method: 'POST',
@@ -39,20 +50,32 @@ export default function FileUploader({onParsed}: {onParsed: FileUploaderProps['o
       }
 
       const result = await res.json();
+      console.log('[📦 Upload Response]', result);
+
+      const resumeEntry: ResumeEntry = {
+        id: uuidv4(),
+        originalText: result.summary,
+        feedback: result.feedback || result.summary,
+        aiVersion: false,
+        createdAt: new Date().toISOString(),
+      };
+
+      onParsed(resumeEntry);
       setSuccess(true);
-      onParsed(result.summary);
-      console.log("[📦 Upload Response]", result);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Upload error:', err);
-      alert('Something went wrong while uploading the resume.');
+      setError(err.message || 'Something went wrong while uploading the resume.');
     } finally {
       setUploading(false);
     }
-  }, []);
+  }, [onParsed]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     maxFiles: 1,
+    accept: {
+      'application/pdf': ['.pdf'],
+    },
   });
 
   return (
@@ -62,23 +85,13 @@ export default function FileUploader({onParsed}: {onParsed: FileUploaderProps['o
         {isDragActive ? (
           <p>Drop the resume here...</p>
         ) : (
-          <p>Drag and drop your resume PDF here, or click to select.</p>
+          <p>Drag and drop your resume PDF here, or click to select a file.</p>
         )}
       </div>
 
       {uploading && <p className="mt-4 text-indigo-600">Uploading and parsing resume...</p>}
-
-      {success && (
-        <div className="mt-6 text-center">
-          <p className="text-green-600 font-semibold mb-4">✅ Resume parsed successfully!</p>
-          <button
-            onClick={() => router.push('/history')}
-            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-          >
-            View History
-          </button>
-        </div>
-      )}
+      {error && <p className="mt-4 text-red-600">❌ {error}</p>}
+      {success && <p className="mt-4 text-green-600">✅ Resume parsed successfully!</p>}
     </div>
   );
 }

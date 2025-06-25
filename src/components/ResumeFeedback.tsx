@@ -7,8 +7,9 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react';
 interface ResumeFeedbackProps {
   feedback: string;
   resumeText: string;
-  onRate: () => void;
+  onRate: (rating: 'up' | 'down') => void;
 }
+
 
 export default function ResumeFeedback({
   feedback,
@@ -43,22 +44,26 @@ export default function ResumeFeedback({
   // };
 
   const rate = async (thumb: 'up' | 'down') => {
-    try {
-      await fetch('/dashboard/api/rate-feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.id,
-          rating: thumb,
-          feedback: generatedFeedback,
-        }),
-      });
-      setRated(true);
-      onRate(); // Let the parent know user rated
-    } catch (err) {
-      console.error('Rating failed:', err);
-    }
-  };
+  try {
+    const rating = thumb === 'up' ? 'positive' : 'negative';
+
+    await fetch('http://localhost:8000/api/store-feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user?.id || 'anonymous',
+        resumeText,
+        feedback: generatedFeedback,
+        rating,
+      }),
+    });
+
+    setRated(true);
+    onRate(thumb); // trigger editor
+  } catch (err) {
+    console.error('Rating failed:', err);
+  }
+};
 
   // useEffect(() => {
   //   if (resumeText) {
