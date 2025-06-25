@@ -1,24 +1,20 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pymongo import MongoClient
-from datetime import datetime
 from fastapi.responses import StreamingResponse
+from datetime import datetime
+from bson import ObjectId, Binary
 from io import BytesIO
 import fitz  # PyMuPDF
 import spacy
 import os
 from dotenv import load_dotenv
-from bson import ObjectId
-from bson import Binary
-# Start server using uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+from pymongo import MongoClient
+from weaviate_server import init_weaviate_client
+from weaviate_server import router as feedback_router
+from global_state import GlobalState  # we'll create this file
 
-load_dotenv()  # Load MONGO_URI from .env
-
-# Init
+# === App Init ===
 app = FastAPI()
-nlp = spacy.load("en_core_web_sm")
-
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,51 +22,59 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# MongoDB
-MONGO_URI = os.getenv("MONGO_URI")  # <- Make sure .env has this
-client = MongoClient(MONGO_URI)
+# === Startup Hook ===
+@app.on_event("startup")
+def init_services():
+    load_dotenv()
 
-try:
-    client.admin.command('ping')
-    print("[✅ MONGODB] Connected to MongoDB Atlas successfully.")
-except Exception as e:
-    print("[❌ MONGODB] Connection failed:", e)
+    # Mongo setup
+    mongo_uri = os.getenv("MONGO_URI")
+    if not mongo_uri:
+        raise RuntimeError("[❌] MONGO_URI missing")
+    mongo_client = MongoClient(mongo_uri)
+    mongo_client.admin.command("ping")
+    db = mongo_client["skillbridge"]
+    print("[✅ MONGO] Connected to MongoDB")
 
+    # NLP setup
+    nlp_model = spacy.load("en_core_web_sm")
+    print("[✅ NLP] spaCy loaded")
 
-db = client["skillbridge"]
-collection = db["resumes"]
+    # Store global
+    GlobalState.mongo_client = mongo_client
+    GlobalState.db = db
+    GlobalState.collection = db["resumes"]
+    GlobalState.nlp = nlp_model
 
+    # Try Weaviate init
+    try:
+        init_weaviate_client()
+    except Exception as e:
+        print(f"[⚠️ WEAVIATE] Failed to initialize Weaviate: {e}")
+
+# === Routes ===
 @app.post("/api/parse-resume")
 async def parse_resume(file: UploadFile = File(...), userId: str = Form(...)):
-    print(f"[RESUME] Received: {file.filename}")
+    print(f"[📄] Upload received: {file.filename}")
     content = await file.read()
-    print("[RESUME] File read successfully")
 
     text = extract_text(content)
-    print("[RESUME] Text extracted")
-
-    doc = nlp(text)
-    print("[RESUME] NLP processed")
-
+    doc = GlobalState.nlp(text)
     skills = [ent.text for ent in doc.ents if ent.label_ in ['SKILL', 'ORG', 'PERSON']]
     summary = text[:1000]
 
-    # Prepare the document
-    resume_data = {
+    resume_doc = {
         "userId": userId,
         "filename": file.filename,
-        "file_data": Binary(content),  # Store the binary data
+        "file_data": Binary(content),
         "parsedText": text,
         "summary": summary,
         "skills": list(set(skills)),
         "uploadedAt": datetime.now()
     }
 
-    # Log it
-    print(f"[📥 MONGO INSERT] Resume data being saved:\n{resume_data}")
-
-    # Insert into MongoDB
-    collection.insert_one(resume_data)
+    print(f"[📥 MONGO] Saving resume for user {userId}")
+    GlobalState.collection.insert_one(resume_doc)
 
     return {
         "filename": file.filename,
@@ -78,23 +82,20 @@ async def parse_resume(file: UploadFile = File(...), userId: str = Form(...)):
         "skills": list(set(skills))
     }
 
-
 @app.get("/api/download-resume/{resume_id}")
 def download_resume(resume_id: str):
-    doc = collection.find_one({"_id": ObjectId(resume_id)})
+    doc = GlobalState.collection.find_one({"_id": ObjectId(resume_id)})
     if not doc:
         raise HTTPException(status_code=404, detail="Resume not found")
-    
-    file_data = doc["file_data"]  # binary
-    filename = doc["filename"]
 
-    return StreamingResponse(BytesIO(file_data), media_type="application/pdf", headers={
-        "Content-Disposition": f"attachment; filename={filename}"
-    })
+    return StreamingResponse(BytesIO(doc["file_data"]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={doc['filename']}"}
+    )
 
 def extract_text(pdf_bytes):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    text = ""
-    for page in doc:
-        text += page.get_text()
-    return text
+    return "".join([page.get_text() for page in doc])
+
+# === Weaviate Router ===
+app.include_router(feedback_router)

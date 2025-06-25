@@ -4,12 +4,16 @@ import { useDropzone } from 'react-dropzone';
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function FileUploader() {
+interface FileUploaderProps {
+  onParsed: (resumeText: string) => void;
+}
+
+export default function FileUploader({onParsed}: {onParsed: FileUploaderProps['onParsed']}) {
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+  const onDrop = useCallback(async(acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
 
     if (!file || file.type !== 'application/pdf') {
@@ -34,8 +38,9 @@ export default function FileUploader() {
         throw new Error(`Failed to upload: ${errorText}`);
       }
 
-      await res.json();
+      const result = await res.json();
       setSuccess(true);
+      onParsed(result.parsedText);
     } catch (err) {
       console.error('Upload error:', err);
       alert('Something went wrong while uploading the resume.');
