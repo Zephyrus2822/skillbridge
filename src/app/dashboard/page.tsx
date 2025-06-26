@@ -7,6 +7,7 @@ import ResumeFeedback from '@/components/ResumeFeedback';
 import ResumeEditor from '@/components/ResumeEditor';
 import SaveFinalResume from '@/components/SaveFinalResume';
 import ResumeRewrite from '@/components/ResumeRewrite';
+import JobDescriptionUploader from '@/components/JobDescriptionUploader';
 
 export default function DashboardPage() {
   const { user, isSignedIn } = useUser();
@@ -68,7 +69,9 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold mb-4">📂 SkillBridge Dashboard</h1>
 
       <FileUploader onParsed={handleParsed} />
-
+      
+      <JobDescriptionUploader />
+      
       {activeResume && activeResume.feedback && (
         <ResumeFeedback
           feedback={activeResume.feedback}
