@@ -10,21 +10,25 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from weaviate.collections.classes.filters import Filter
 from weaviate.classes.config import Configure, Property, DataType
 from weaviate.classes.init import Auth
+import requests
+from fastapi.responses import FileResponse
+from weaviate.collections.classes.filters import Filter
 
+
+load_dotenv() # Loads .env file once for everything
 
 router = APIRouter()
-client = None
+client = None # Initialize Weaviate client as None , this gets updated through backend
 
 
 # ----------------- INIT WEAVIATE CONNECTION -----------------
 def init_weaviate_client():
     global client
 
-    load_dotenv()
+    
     WEAVIATE_URL = os.getenv("WEAVIATE_URL")
     WEAVIATE_API_KEY = os.getenv("WEAVIATE_API_KEY")
     COHERE_KEY = os.getenv("COHERE_APIKEY")
-    
     
     headers = { "X-Cohere-Api-Key": COHERE_KEY,}
     
@@ -73,7 +77,7 @@ def build_feedback_agent():
     gemini_key = os.getenv("GOOGLE_GEMINI_API_KEY")
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash",
         temperature=0.7,
         convert_system_message_to_human=True,
         google_api_key=gemini_key
@@ -115,7 +119,7 @@ def get_job_role(job_text: str) -> str:
         """
     )
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash",
         temperature=0.2,
         convert_system_message_to_human=True,
         google_api_key=os.getenv("GOOGLE_GEMINI_API_KEY")
@@ -239,7 +243,7 @@ Now generate:
             job_text = "No job description available."
             
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash",
             temperature=0.65,
             convert_system_message_to_human=True,
             google_api_key=os.getenv("GOOGLE_GEMINI_API_KEY")
@@ -270,7 +274,6 @@ async def store_feedback(payload: dict):
 
     store_feedback_vector(user_id, resume_text, feedback, job_text, rating)
     return {"message": "Feedback stored"}
-
 
 @router.post("/api/rewrite-resume")
 async def rewrite_resume(payload: dict):
@@ -303,7 +306,15 @@ async def rewrite_resume(payload: dict):
         else:
             past_context = "\n\n---\n\n".join([obj.properties["text"] for obj in query_result.objects])
 
-        # Generate rewritten resume
+        # Get job description
+        job_collection = client.collections.get("JobDescription")
+        job_query = job_collection.query.fetch_objects(
+            filters=Filter.by_property("user_id").equal(user_id),
+            limit=1
+        )
+        job_text = job_query.objects[0].properties.get("job_text") if job_query.objects else "No job description available."
+
+        # Prompt
         improvement_prompt = PromptTemplate(
             input_variables=["latest_resume", "past_context", "job_text"],
             template="""
@@ -315,122 +326,59 @@ You're a career assistant. Improve the resume using past resume versions and fee
 ### Past Attempts (Resume + Feedback):
 {past_context}
 
-### Take into consideration the job descriptions provided by the user:
+### Job Description:
 {job_text}
 
 ### Instructions:
-1. Analyze the current resume and past feedback.
-2. Identify the core strengths for the candidate that he can show off to the recruiters.
-3. Make improvements on the corporate jargon, language used in the resume. The improved resume must not have any copy-pasted segments from previous resume.
-4. Make sure that the resume generated here is ATS-friendly and can by-pass AI checks.
-5. Make sure that the resume is long enough to cover ONE A4 PAGE for candidate's experience from 0 years to 5 years.
-6. Make sure that the generated resume follows the following format: (.md format for easy accessibility and Replace all placeholder variables (indicated by {{variable_name}}) with appropriate content based on the provided information.)
-    {{FULL_NAME}}
-{{STREET_ADDRESS}}, {{CITY}}, {{STATE}} {{ZIP_CODE}}
-📞 {{PHONE_NUMBER}}
-✉️ {{EMAIL_ADDRESS}}
-🔗 {{LINKEDIN_URL}}
-💻 {{GITHUB_URL}}
-Education
-{{UNIVERSITY_NAME}}
-{{START_DATE}} -- {{END_DATE}}
-{{UNIVERSITY_CITY}}, {{UNIVERSITY_STATE}}
-{{DEGREE_TYPE}} in {{MAJOR}}
-Relevant Coursework
-{{COURSE_1}}, {{COURSE_2}}, {{COURSE_3}}, {{COURSE_4}}, {{COURSE_5}}, {{COURSE_6}}, {{COURSE_7}}, {{COURSE_8}}
-Experience
-{{COMPANY_1_NAME}}
-{{POSITION_1_START_DATE}} -- {{POSITION_1_END_DATE}}
-{{JOB_TITLE_1}}
-{{COMPANY_1_CITY}}, {{COMPANY_1_STATE}}
+Return your output in the following format:
 
-{{ACHIEVEMENT_1_1}}
-{{ACHIEVEMENT_1_2}}
-{{ACHIEVEMENT_1_3}}
-{{ACHIEVEMENT_1_4}}
+---MARKDOWN---
+<Markdown resume here>
+---ENDMARKDOWN---
 
-{{COMPANY_2_NAME}}
-{{POSITION_2_START_DATE}} -- {{POSITION_2_END_DATE}}
-{{JOB_TITLE_2}}
-{{COMPANY_2_CITY}}, {{COMPANY_2_STATE}}
-
-{{ACHIEVEMENT_2_1}}
-{{ACHIEVEMENT_2_2}}
-{{ACHIEVEMENT_2_3}}
-{{ACHIEVEMENT_2_4}}
-
-Projects
-{{PROJECT_1_NAME}} | {{PROJECT_1_TECHNOLOGIES}}
-{{PROJECT_1_DATE}}
-
-{{PROJECT_1_DESCRIPTION_1}}
-{{PROJECT_1_DESCRIPTION_2}}
-{{PROJECT_1_DESCRIPTION_3}}
-{{PROJECT_1_DESCRIPTION_4}}
-
-{{PROJECT_2_NAME}} | {{PROJECT_2_TECHNOLOGIES}}
-{{PROJECT_2_DATE}}
-
-{{PROJECT_2_DESCRIPTION_1}}
-{{PROJECT_2_DESCRIPTION_2}}
-{{PROJECT_2_DESCRIPTION_3}}
-
-{{PROJECT_3_NAME}} | {{PROJECT_3_TECHNOLOGIES}}
-{{PROJECT_3_DATE}}
-
-{{PROJECT_3_DESCRIPTION_1}}
-{{PROJECT_3_DESCRIPTION_2}}
-{{PROJECT_3_DESCRIPTION_3}}
-
-Technical Skills
-Languages: {{PROGRAMMING_LANGUAGES}}
-Developer Tools: {{DEVELOPMENT_TOOLS}}
-Technologies/Frameworks: {{TECHNOLOGIES_FRAMEWORKS}}
-Leadership / Extracurricular
-{{ORGANIZATION_NAME}}
-{{LEADERSHIP_START_DATE}} -- {{LEADERSHIP_END_DATE}}
-{{LEADERSHIP_POSITION}}
-{{ORGANIZATION_LOCATION}}
-
-{{LEADERSHIP_ACHIEVEMENT_1}}
-{{LEADERSHIP_ACHIEVEMENT_2}}
-{{LEADERSHIP_ACHIEVEMENT_3}}
-7. Do not include any information that is not present in current resume. If there is not enough information in current resume, keep certain fields blank.
-8. Make sure to put as much skill names in the rewritten resume as possible that matches exactly with the job description provided.
-   For example, if the job description mentions Backend Development or similar, make sure to include that in rewritten resume and also mention relevant skills in the skills section.
-   Do this MANDATORILY for all the skills mentioned in the job description.
-
-
-Now generate:
-- An improved resume
-- 2-3 project ideas relevant to 2024-25 job trends.
+---LATEX---
+<LaTeX resume here>
+---ENDLATEX---
 """
         )
-        job_collection = client.collections.get("JobDescription")
-        job_query = job_collection.query.fetch_objects(
-            filters=Filter.by_property("user_id").equal(user_id),
-            limit=1
-        )
-        if job_query.objects:
-            job_text = job_query.objects[0].properties["job_text"]
-        else:
-            job_text = "No job description available."
-        
+
+        # Run agent
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash",
             temperature=0.65,
             convert_system_message_to_human=True,
             google_api_key=os.getenv("GOOGLE_GEMINI_API_KEY")
         )
         improved_agent = improvement_prompt | llm
-        rewritten = improved_agent.invoke({
+        result = improved_agent.invoke({
             "latest_resume": resume_text,
             "past_context": past_context,
             "job_text": job_text,
         })
 
+        response_text = result.content if hasattr(result, "content") else str(result)
+
+        # Safe parser
+        def extract_section(tag: str) -> str:
+            try:
+                start = f"---{tag.upper()}---"
+                end = f"---END{tag.upper()}---"
+                return response_text.split(start)[1].split(end)[0].strip()
+            except IndexError:
+                print(f"[⚠️ Missing Section] {tag} not found in AI response.")
+                return ""
+
+        markdown_resume = extract_section("markdown")
+        latex_resume = extract_section("latex")
+
+        if not markdown_resume or not latex_resume:
+            print("[⚠️ FORMAT WARNING] One or both resume formats are missing.")
+
         print("[✅ REWRITE DONE]")
-        return {"rewritten": rewritten}
+        return {
+            "markdown": markdown_resume,
+            "latex": latex_resume
+        }
 
     except Exception as e:
         print("[❌ REWRITE ERROR]", str(e))
@@ -458,3 +406,105 @@ async def store_job_description(payload: dict):
     except Exception as e:
         print("[❌ JOB STORE ERROR]", str(e))
         raise HTTPException(status_code=500, detail="Failed to store job description")
+
+
+@router.post("/api/trigger-publish")
+async def trigger_publish(payload: dict):
+    user_id = payload.get("userId", "anonymous")
+    job_text = payload.get("job_text")
+
+    if not job_text:
+        raise HTTPException(status_code=400, detail="Missing job_text in payload")
+
+    role = get_job_role(job_text)
+
+    # Jenkins config
+    jenkins_url = os.getenv("JENKINS_URL")  
+    jenkins_token = os.getenv("JENKINS_TOKEN")
+    jenkins_user = os.getenv("JENKINS_USER", "jenkins_user") 
+
+    if not jenkins_url or not jenkins_token:
+        raise HTTPException(status_code=500, detail="Jenkins credentials not set in .env file")
+
+    # Jenkins accepts build parameters like user_id and role
+    params = {
+        "user_id": user_id,
+        "role": role,
+        "mode": payload.get("mode", "latex")
+    }
+
+    try:
+        response = requests.post(
+            jenkins_url,
+            params=params,
+            auth=(jenkins_user, jenkins_token)
+        )
+
+        if response.status_code in [200, 201]:
+            return {
+                "success": True,
+                "message": f"Jenkins pipeline triggered for user {user_id} and role {role}"
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"Jenkins error: {response.text}")
+
+    except Exception as e:
+        print("[❌ PIPELINE TRIGGER ERROR]", str(e))
+        raise HTTPException(status_code=500, detail="Failed to trigger Jenkins pipeline")
+
+
+@router.get("/get-resume")
+def get_resume(resume_id: str):
+    file_path = f"/path/to/resumes/{resume_id}.tex"
+    return FileResponse(path=file_path, media_type='application/x-tex')   
+
+@router.post("/api/compile-latex")
+async def save_tex(payload: dict):
+    user_id = payload.get("userId", "anonymous")
+    role = payload.get("role")
+    tex_content = payload.get("texContent")
+    # job_text = payload.get("jobText", "")
+
+    if not user_id or not role or not tex_content:
+        raise HTTPException(status_code=400, detail="Missing userId, role, or texContent in payload")
+
+    try:
+        resume_dir = os.getenv("RESUME_OUTPUT_DIR", "Resumes")
+        os.makedirs(resume_dir, exist_ok=True)
+
+        filename = f"{user_id}_{role.replace(' ', '-')}.tex"
+        file_path = os.path.join(resume_dir, filename)
+        print("[DEBUG] Final file path:", file_path)
+        with open(file_path, "w", encoding="utf-8") as file:
+            file.write(tex_content)
+
+        print(f"[✅] LaTeX file saved at: {file_path}")
+        return {"message": "LateX file saved successfully", "file_path": file_path}
+
+    except Exception as e:
+        print(f"[❌] Error saving LaTeX file: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save LaTeX file")
+
+    
+@router.get("/api/get-role/{user_id}")
+async def get_role(user_id: str):
+    try:
+        collection = client.collections.get("JobDescription")
+        results = collection.query.fetch_objects(
+            filters=Filter.by_property("user_id").equal(user_id),
+            limit=1
+        )
+
+        if not results or not results.objects:
+            raise HTTPException(status_code=404, detail="No job description found for this user")
+
+        job_text = results.objects[0].properties.get("job_text")
+        if not job_text:
+            raise HTTPException(status_code=404, detail="Job description is empty")
+
+        role = get_job_role(job_text)
+        return {"role": role}
+
+    except Exception as e:
+        print(f"[❌] Error fetching role: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch user role")

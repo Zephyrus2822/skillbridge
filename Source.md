@@ -13,3 +13,12 @@
 - Helpful comments for development using AI models.
 
 4. Jake's Resume Template from [Overleaf](https://www.overleaf.com/latex/templates/jakes-resume-anonymous/cstpnrbkhndn)
+
+- Served as base template for resume generation for rewrite.
+
+5. TechRepublic Article from 2008 : [https://www.techrepublic.com/article/see-what-process-is-using-a-tcp-port-in-windows-server-2008/](https://www.techrepublic.com/article/see-what-process-is-using-a-tcp-port-in-windows-server-2008/)
+
+- thanks netstat -a -o -n | grep 8080 (run this in bash for fun)
+- :D
+
+

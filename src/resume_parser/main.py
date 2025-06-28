@@ -20,12 +20,15 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True
 )
 
 # === Startup Hook ===
 @app.on_event("startup")
 def init_services():
     load_dotenv()
+    print("[DEBUG] RESUME_OUTPUT_DIR:", os.getenv("RESUME_OUTPUT_DIR"))
+
 
     # Mongo setup
     mongo_uri = os.getenv("MONGO_URI")
