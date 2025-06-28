@@ -13,12 +13,34 @@ from weaviate.classes.init import Auth
 import requests
 from fastapi.responses import FileResponse
 from weaviate.collections.classes.filters import Filter
+from pydantic import BaseModel
 
 
 load_dotenv() # Loads .env file once for everything
 
 router = APIRouter()
 client = None # Initialize Weaviate client as None , this gets updated through backend
+
+# Helper Functions (I am losing my mind its 3.18am here UTC +5.30)
+def save_tex_to_file(user_id: str, role: str, tex_content: str) -> str:
+    resume_dir = os.getenv("RESUME_OUTPUT_DIR", "Resumes")
+    os.makedirs(resume_dir, exist_ok=True)
+
+    filename = f"{user_id}_{role.replace(' ', '-')}.tex"
+    file_path = os.path.join(resume_dir, filename)
+
+    with open(file_path, "w", encoding="utf-8") as file:
+        file.write(tex_content)
+
+    print(f"[✅] LaTeX file saved at: {file_path}")
+    return file_path
+
+# Jenkins Pipeline Trigger
+class TriggerPayload(BaseModel):
+    userId: str
+    job_text: str
+    mode: str = "latex"
+    texContent: str
 
 
 # ----------------- INIT WEAVIATE CONNECTION -----------------
@@ -406,51 +428,63 @@ async def store_job_description(payload: dict):
     except Exception as e:
         print("[❌ JOB STORE ERROR]", str(e))
         raise HTTPException(status_code=500, detail="Failed to store job description")
-
-
+    
 @router.post("/api/trigger-publish")
-async def trigger_publish(payload: dict):
-    user_id = payload.get("userId", "anonymous")
-    job_text = payload.get("job_text")
 
-    if not job_text:
-        raise HTTPException(status_code=400, detail="Missing job_text in payload")
-
-    role = get_job_role(job_text)
-
-    # Jenkins config
-    jenkins_url = os.getenv("JENKINS_URL")  
-    jenkins_token = os.getenv("JENKINS_TOKEN")
-    jenkins_user = os.getenv("JENKINS_USER", "jenkins_user") 
-
-    if not jenkins_url or not jenkins_token:
-        raise HTTPException(status_code=500, detail="Jenkins credentials not set in .env file")
-
-    # Jenkins accepts build parameters like user_id and role
-    params = {
-        "user_id": user_id,
-        "role": role,
-        "mode": payload.get("mode", "latex")
-    }
-
+async def trigger_publish(payload: TriggerPayload):
     try:
-        response = requests.post(
+        user_id = payload.userId or "anonymous"
+        job_text = payload.job_text
+        tex_content = payload.texContent
+        print(f"🔍 Received payload: {payload.dict()}")
+
+        role = get_job_role(job_text)
+        print(f"🎯 Inferred Role: {role}")
+
+        # ✅ Save LaTeX file first
+        try:
+            file_path = save_tex_to_file(user_id, role, tex_content)
+        except Exception as e:
+            print(f"[❌ ERROR] Saving LaTeX failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to compile LaTeX: {e}")
+
+        # 🔐 Jenkins Config
+        jenkins_url = os.getenv("JENKINS_URL")
+        jenkins_token = os.getenv("JENKINS_TOKEN")
+        jenkins_user = os.getenv("JENKINS_USER", "zephyrus2")
+
+        if not all([jenkins_url, jenkins_user, jenkins_token]):
+            raise HTTPException(status_code=500, detail="Missing Jenkins credentials or URL in environment.")
+
+        # Jenkins Parameters
+        params = {
+            "user_id": user_id,
+            "role": role,
+            "mode": payload.mode,
+        }
+
+        print(f"🚀 Triggering Jenkins at {jenkins_url} with params: {params}")
+
+        res = requests.post(
             jenkins_url,
             params=params,
             auth=(jenkins_user, jenkins_token)
         )
 
-        if response.status_code in [200, 201]:
+        if res.status_code in [200, 201]:
+            print("[✅] Jenkins triggered successfully.")
             return {
                 "success": True,
-                "message": f"Jenkins pipeline triggered for user {user_id} and role {role}"
+                "message": f"✅ Jenkins pipeline triggered for user `{user_id}` and role `{role}`",
+                "file_path": file_path,
             }
         else:
-            raise HTTPException(status_code=500, detail=f"Jenkins error: {response.text}")
+            print(f"[❌ Jenkins Error] Status: {res.status_code} - {res.text}")
+            raise HTTPException(status_code=500, detail=f"Jenkins error: {res.text}")
 
     except Exception as e:
-        print("[❌ PIPELINE TRIGGER ERROR]", str(e))
-        raise HTTPException(status_code=500, detail="Failed to trigger Jenkins pipeline")
+        print(f"[❌ PIPELINE TRIGGER ERROR] {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to trigger Jenkins pipeline: {str(e)}")
 
 
 @router.get("/get-resume")

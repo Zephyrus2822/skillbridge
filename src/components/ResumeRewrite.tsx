@@ -100,6 +100,7 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
           userId: user?.id || 'anonymous',
           job_text: jobText,
           mode: 'latex',
+          texContent: latexResume,
         }),
       });
 
