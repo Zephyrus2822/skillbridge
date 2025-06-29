@@ -8,6 +8,7 @@ import ResumeEditor from '@/components/ResumeEditor';
 import SaveFinalResume from '@/components/SaveFinalResume';
 import ResumeRewrite from '@/components/ResumeRewrite';
 import JobDescriptionUploader from '@/components/JobDescriptionUploader';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function DashboardPage() {
   const { user, isSignedIn } = useUser();
@@ -65,36 +66,90 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">📂 SkillBridge Dashboard</h1>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="p-6 max-w-5xl mx-auto min-h-screen"
+    >
+      <motion.h1
+        className="text-3xl font-bold text-gray-800 mb-8 text-center"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        📂 SkillBridge Resume Dashboard
+      </motion.h1>
 
-      <FileUploader onParsed={handleParsed} />
-      
-      <JobDescriptionUploader />
-      
-      {activeResume && activeResume.feedback && (
-        <ResumeFeedback
-          feedback={activeResume.feedback}
-          resumeText={activeResume.originalText}
-          onRate={handleRate}
-        />
-      )}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <FileUploader onParsed={handleParsed} />
+      </motion.div>
 
-      {showEditor && activeResume && (
-        <>
-          <ResumeEditor
-            initialText={activeResume.editedText || activeResume.originalText}
-            onUpdate={handleEditUpdate}
-          />
-          <SaveFinalResume
-            resumeText={activeResume.editedText || activeResume.originalText}
-          />
-        </>
-      )}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+      >
+        <JobDescriptionUploader />
+      </motion.div>
 
-      {showRewrite && activeResume && (
-        <ResumeRewrite originalResume={activeResume.originalText} />
-      )}
-    </div>
+      <AnimatePresence>
+        {activeResume?.feedback && (
+          <motion.div
+            key="feedback"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.4 }}
+            className="mt-10"
+          >
+            <ResumeFeedback
+              feedback={activeResume.feedback}
+              resumeText={activeResume.originalText}
+              onRate={handleRate}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showEditor && activeResume && (
+          <motion.div
+            key="editor"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.5 }}
+            className="mt-10"
+          >
+            <ResumeEditor
+              initialText={activeResume.editedText || activeResume.originalText}
+              onUpdate={handleEditUpdate}
+            />
+            <SaveFinalResume
+              resumeText={activeResume.editedText || activeResume.originalText}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showRewrite && activeResume && (
+          <motion.div
+            key="rewrite"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.5 }}
+            className="mt-10"
+          >
+            <ResumeRewrite originalResume={activeResume.originalText} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

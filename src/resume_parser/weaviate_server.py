@@ -14,6 +14,7 @@ import requests
 from fastapi.responses import FileResponse
 from weaviate.collections.classes.filters import Filter
 from pydantic import BaseModel
+import re
 
 
 load_dotenv() # Loads .env file once for everything
@@ -22,11 +23,20 @@ router = APIRouter()
 client = None # Initialize Weaviate client as None , this gets updated through backend
 
 # Helper Functions (I am losing my mind its 3.18am here UTC +5.30)
+
+
+def sanitize_filename(s: str) -> str:
+    """
+    Replace unsafe filename characters (e.g., /, \, :, *, ?, ", <, >, |, and spaces) with underscores.
+    """
+    # Replace unsafe characters and whitespace
+    return re.sub(r'[\\/*?:"<>| ]', "_", s)
+
 def save_tex_to_file(user_id: str, role: str, tex_content: str) -> str:
     resume_dir = os.getenv("RESUME_OUTPUT_DIR", "Resumes")
     os.makedirs(resume_dir, exist_ok=True)
-
-    filename = f"{user_id}_{role.replace(' ', '-')}.tex"
+    safe_role = sanitize_filename(role)
+    filename = f"{user_id}_{safe_role.replace(' ', '-')}.tex"
     file_path = os.path.join(resume_dir, filename)
 
     with open(file_path, "w", encoding="utf-8") as file:
@@ -34,6 +44,8 @@ def save_tex_to_file(user_id: str, role: str, tex_content: str) -> str:
 
     print(f"[✅] LaTeX file saved at: {file_path}")
     return file_path
+
+
 
 # Jenkins Pipeline Trigger
 class TriggerPayload(BaseModel):
@@ -505,8 +517,8 @@ async def save_tex(payload: dict):
     try:
         resume_dir = os.getenv("RESUME_OUTPUT_DIR", "Resumes")
         os.makedirs(resume_dir, exist_ok=True)
-
-        filename = f"{user_id}_{role.replace(' ', '-')}.tex"
+        safe_role = sanitize_filename(role)
+        filename = f"{user_id}_{safe_role.replace(' ', '-')}.tex"
         file_path = os.path.join(resume_dir, filename)
         print("[DEBUG] Final file path:", file_path)
         with open(file_path, "w", encoding="utf-8") as file:

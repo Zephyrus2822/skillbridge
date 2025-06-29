@@ -3,6 +3,7 @@
 import { useDropzone } from 'react-dropzone';
 import { useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FileUploaderProps {
   onParsed: (resume: ResumeEntry) => void;
@@ -79,19 +80,77 @@ export default function FileUploader({ onParsed }: FileUploaderProps) {
   });
 
   return (
-    <div className="p-6 border-2 border-dashed rounded-lg text-center">
-      <div {...getRootProps()} className="cursor-pointer p-10 bg-gray-50">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+      className="max-w-2xl mx-auto mt-8"
+    >
+      <div
+        {...getRootProps()}
+        className="transition-all duration-300 ease-in-out p-10 border-2 border-dashed border-gray-300 rounded-2xl bg-white hover:bg-gray-50 cursor-pointer shadow-sm text-center"
+      >
         <input {...getInputProps()} />
         {isDragActive ? (
-          <p>Drop the resume here...</p>
+          <motion.p
+            key="active"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring' }}
+            className="text-indigo-600 font-medium"
+          >
+            Drop the resume here...
+          </motion.p>
         ) : (
-          <p>Drag and drop your resume PDF here, or click to select a file.</p>
+          <motion.p
+            key="idle"
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 120 }}
+            className="text-gray-700"
+          >
+            Drag and drop your resume <strong>PDF</strong> here,<br /> or click to select a file.
+          </motion.p>
         )}
       </div>
 
-      {uploading && <p className="mt-4 text-indigo-600">Uploading and parsing resume...</p>}
-      {error && <p className="mt-4 text-red-600">❌ {error}</p>}
-      {success && <p className="mt-4 text-green-600">✅ Resume parsed successfully!</p>}
-    </div>
+      <AnimatePresence mode="wait">
+        {uploading && (
+          <motion.p
+            key="uploading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="mt-4 text-indigo-600 text-center"
+          >
+            ⏳ Uploading and parsing resume...
+          </motion.p>
+        )}
+
+        {error && (
+          <motion.p
+            key="error"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="mt-4 text-red-600 text-center"
+          >
+            ❌ {error}
+          </motion.p>
+        )}
+
+        {success && (
+          <motion.p
+            key="success"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="mt-4 text-green-600 text-center"
+          >
+            ✅ Resume parsed successfully!
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

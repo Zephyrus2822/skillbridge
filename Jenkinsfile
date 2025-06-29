@@ -26,12 +26,13 @@ pipeline {
         stage('Copy Resume File') {
             steps {
                 script {
-                    def safeRole = params.role.replaceAll(' ', '-')
+                    def safeRole = params.role.replaceAll('[\\\\/*?:"<>| ]', '_')
                     def ext = params.mode == 'latex' ? 'tex' : 'pdf'
                     def filename = "${params.user_id}_${safeRole}.${ext}"
                     def srcPath = "${env.TEX_DIR}\\${filename}"
                     def destPath = "${env.WORKSPACE}\\${filename}"
                     echo "🔄 Copying ${srcPath} to Jenkins workspace"
+                    bat "dir \"${env.TEX_DIR}\""
                     bat "copy \"${srcPath}\" \"${destPath}\""
                 }
             }
@@ -40,10 +41,9 @@ pipeline {
         stage('Git Commit & Push') {
             steps {
                 script {
-                    def safeRole = params.role.replaceAll(' ', '-')
+                    def safeRole = params.role.replaceAll('[\\\\/*?:"<>| ]', '_')
                     def ext = params.mode == 'latex' ? 'tex' : 'pdf'
                     def filename = "${params.user_id}_${safeRole}.${ext}"
-
                     bat """
                     git config --global user.name "JenkinsBot"
                     git config --global user.email "jenkins@localhost"
@@ -51,8 +51,8 @@ pipeline {
                     git add "${filename}"
                     git commit -m "Update resume: ${filename}" || echo Nothing to commit
                     echo 🔼 Pushing to GitHub...
-git push -u origin main
-echo ✅ Push complete!
+                    git push -u origin main
+                    echo ✅ Push complete!
                     exit /b 0
                 """
                 }

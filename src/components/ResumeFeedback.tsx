@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface ResumeFeedbackProps {
   feedback: string;
   resumeText: string;
   onRate: (rating: 'up' | 'down') => void;
 }
-
 
 export default function ResumeFeedback({
   feedback,
@@ -18,89 +18,72 @@ export default function ResumeFeedback({
 }: ResumeFeedbackProps) {
   const { user } = useUser();
   const [generatedFeedback, setGeneratedFeedback] = useState<string>(
-  typeof feedback === 'string' ? feedback : (feedback as any)?.content || ''
-);
+    typeof feedback === 'string' ? feedback : (feedback as any)?.content || 'No feedback available.'
+  );
   const [loading, setLoading] = useState<boolean>(false);
   const [rated, setRated] = useState<boolean>(false);
 
-//   const fetchFeedback = async () => {
-//     setLoading(true);
-//     try {
-//       const res = await fetch('http://localhost:8000/api/get-feedback', {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json' },
-//         body: JSON.stringify({ userId: user?.id, resumeText }),
-//       });
-
-//       const data = await res.json();
-//       setGeneratedFeedback(
-//   typeof data.feedback === 'string' ? data.feedback : data.feedback?.content || 'No feedback available.'
-// );
-  //   } catch (err) {
-  //     console.error('Failed to fetch feedback:', err);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
   const rate = async (thumb: 'up' | 'down') => {
-  try {
-    const rating = thumb === 'up' ? 'positive' : 'negative';
+    try {
+      const rating = thumb === 'up' ? 'positive' : 'negative';
 
-    await fetch('http://localhost:8000/api/store-feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: user?.id || 'anonymous',
-        resumeText,
-        feedback: generatedFeedback,
-        rating,
-      }),
-    });
+      await fetch('http://localhost:8000/api/store-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id || 'anonymous',
+          resumeText,
+          feedback: generatedFeedback,
+          rating,
+        }),
+      });
 
-    setRated(true);
-    onRate(thumb); // trigger editor
-  } catch (err) {
-    console.error('Rating failed:', err);
-  }
-};
-
-  // useEffect(() => {
-  //   if (resumeText) {
-  //     fetchFeedback();
-  //   }
-    
-  // }, [resumeText]);
+      setRated(true);
+      onRate(thumb);
+    } catch (err) {
+      console.error('Rating failed:', err);
+    }
+  };
 
   return (
-    <div className="mt-6 bg-white p-6 rounded-lg shadow">
-      <h2 className="text-xl font-bold mb-2">🤖 AI Feedback</h2>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      className="mt-10 bg-white p-6 rounded-xl shadow-md"
+    >
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">🤖 AI Feedback</h2>
+
       {loading ? (
-        <p>Generating smart feedback...</p>
+        <p className="text-gray-500">Generating smart feedback...</p>
       ) : (
-        <p className="whitespace-pre-line">{generatedFeedback}</p>
+        <p className="text-gray-700 whitespace-pre-line leading-relaxed">
+          {generatedFeedback}
+        </p>
       )}
 
-      {!rated && (
-        <div className="flex gap-4 mt-4">
+      {!rated ? (
+        <div className="flex gap-6 mt-6 items-center">
           <button
             onClick={() => rate('up')}
-            className="hover:text-green-600 transition"
+            className="text-gray-500 hover:text-green-600 transition"
+            title="Helpful"
           >
-            <ThumbsUp />
+            <ThumbsUp size={24} />
           </button>
           <button
             onClick={() => rate('down')}
-            className="hover:text-red-600 transition"
+            className="text-gray-500 hover:text-red-600 transition"
+            title="Needs Improvement"
           >
-            <ThumbsDown />
+            <ThumbsDown size={24} />
           </button>
         </div>
+      ) : (
+        <p className="text-green-600 mt-4 font-medium">
+          ✅ Thanks for your feedback!
+        </p>
       )}
-
-      {rated && (
-        <p className="text-green-600 mt-2">✅ Thanks for your feedback!</p>
-      )}
-    </div>
+    </motion.div>
   );
 }
