@@ -12,6 +12,7 @@ from pymongo import MongoClient
 from weaviate_server import init_weaviate_client
 from weaviate_server import router as feedback_router
 from global_state import GlobalState  # we'll create this file
+import certifi
 
 # === App Init ===
 app = FastAPI()
@@ -34,7 +35,7 @@ def init_services():
     mongo_uri = os.getenv("MONGO_URI")
     if not mongo_uri:
         raise RuntimeError("[❌] MONGO_URI missing")
-    mongo_client = MongoClient(mongo_uri)
+    mongo_client = MongoClient(mongo_uri, tlsCAFile=certifi.where())
     mongo_client.admin.command("ping")
     db = mongo_client["skillbridge"]
     print("[✅ MONGO] Connected to MongoDB")
