@@ -4,12 +4,12 @@ services:
     build: ./src/resume_parser
     container_name: resume_parser
     ports:
-      - "8000:8000"
+      - "8085:8000"
     env_file:
       - .env
     environment:
       - RESUME_OUTPUT_DIR=/app/resumes
-      - WEAVIATE_URL=http://weaviate:8080
+      - WEAVIATE_URL=http://weaviate:8085
     volumes:
       - ./src/resume_parser:/app
       - ./resumes:/app/resumes
