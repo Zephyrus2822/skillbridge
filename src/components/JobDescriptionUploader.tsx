@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { motion, AnimatePresence } from 'framer-motion';
 
+interface ApiResponse {
+  error?: string;
+  message?: string;
+}
+
 export default function JobDescriptionUploader() {
   const { user } = useUser();
   const [jobText, setJobText] = useState<string>('');
@@ -31,13 +36,17 @@ export default function JobDescriptionUploader() {
         }),
       });
 
-      const data = await res.json();
+      const data: ApiResponse = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to store job description');
 
       setMessage('✅ Job description stored successfully!');
       setJobText('');
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong.');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Something went wrong.');
+      }
     } finally {
       setLoading(false);
     }

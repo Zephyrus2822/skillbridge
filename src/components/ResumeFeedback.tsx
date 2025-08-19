@@ -1,6 +1,5 @@
 'use client';
-
-import { useState } from 'react';
+import {useState} from 'react';
 import { useUser } from '@clerk/nextjs';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -19,10 +18,10 @@ export default function ResumeFeedback({
   onRate,
 }: ResumeFeedbackProps) {
   const { user } = useUser();
-  const [generatedFeedback, setGeneratedFeedback] = useState<string>(
-    typeof feedback === 'string' ? feedback : feedback?.content || 'No feedback available.'
-  );
-  const [loading, setLoading] = useState<boolean>(false);
+  const generatedFeedback =
+    typeof feedback === 'string'
+      ? feedback
+      : feedback?.content || 'No feedback available.';
   const [rated, setRated] = useState<boolean>(false);
 
   const rate = async (thumb: 'up' | 'down') => {
@@ -56,13 +55,9 @@ export default function ResumeFeedback({
     >
       <h2 className="text-xl font-semibold text-gray-800 mb-4">🤖 AI Feedback</h2>
 
-      {loading ? (
-        <p className="text-gray-500">Generating smart feedback...</p>
-      ) : (
-        <p className="text-gray-700 whitespace-pre-line leading-relaxed">
-          {generatedFeedback}
-        </p>
-      )}
+      <p className="text-gray-700 whitespace-pre-line leading-relaxed">
+        {generatedFeedback}
+      </p>
 
       {!rated ? (
         <div className="flex gap-6 mt-6 items-center">

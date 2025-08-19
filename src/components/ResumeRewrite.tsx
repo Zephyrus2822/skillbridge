@@ -10,6 +10,27 @@ interface ResumeRewriteProps {
   originalResume: string;
 }
 
+interface RewriteResponse {
+  markdown?: string;
+  latex?: string;
+  error?: string;
+}
+
+interface CompileLatexResponse {
+  file_path: string;
+  detail?: string;
+}
+
+interface PublishResponse {
+  success?: boolean;
+  error?: string;
+}
+
+interface RoleResponse {
+  role?: string;
+  job_text?: string;
+}
+
 export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
@@ -32,14 +53,19 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
         }),
       });
 
-      const data = await res.json();
+      const data: RewriteResponse = await res.json();
       if (!res.ok) throw new Error(data.error || 'Rewrite failed');
 
       setMarkdownResume(data.markdown || '');
       setLatexResume(data.latex || '');
-    } catch (err: any) {
-      console.error('❌ Rewrite failed:', err);
-      setError(err.message || 'Failed to rewrite resume.');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error('❌ Rewrite failed:', err.message);
+        setError(err.message);
+      } else {
+        console.error('❌ Rewrite failed:', err);
+        setError('Failed to rewrite resume.');
+      }
     } finally {
       setLoading(false);
     }
@@ -62,13 +88,18 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
         }),
       });
 
-      const data = await res.json();
+      const data: CompileLatexResponse = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to save LaTeX');
 
       console.log(`[✅ COMPILED LaTeX] Saved at: ${data.file_path}`);
-    } catch (err) {
-      console.error('❌ Error saving LaTeX:', err);
-      setError('Failed to compile and save LaTeX.');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error('❌ Error saving LaTeX:', err.message);
+        setError(err.message);
+      } else {
+        console.error('❌ Error saving LaTeX:', err);
+        setError('Failed to compile and save LaTeX.');
+      }
     }
   };
 
@@ -101,15 +132,20 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
         }),
       });
 
-      const data = await res.json();
+      const data: PublishResponse = await res.json();
       if (data.success) {
         alert('✅ Resume pushed to GitHub via Jenkins!');
       } else {
         throw new Error(data.error || 'Pipeline trigger failed');
       }
-    } catch (err) {
-      console.error('❌ Publish error:', err);
-      alert('❌ Error publishing to GitHub via Jenkins.');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error('❌ Publish error:', err.message);
+        alert(`❌ Error publishing: ${err.message}`);
+      } else {
+        console.error('❌ Publish error:', err);
+        alert('❌ Error publishing to GitHub via Jenkins.');
+      }
     }
   };
 
@@ -128,7 +164,7 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
       if (!user?.id) return;
       try {
         const res = await fetch(`http://localhost:8000/api/get-role/${user.id}`);
-        const data = await res.json();
+        const data: RoleResponse = await res.json();
         setUserRole(data.role || 'resume');
         if (data.job_text) setJobText(data.job_text);
       } catch (err) {
