@@ -14,7 +14,6 @@ interface ResumeEntry {
 
 export default function HistoryPage() {
   const { user } = useUser();
-  const router = useRouter();
   const [resumes, setResumes] = useState<ResumeEntry[]>([]);
   const [loading, setLoading] = useState(true);
 

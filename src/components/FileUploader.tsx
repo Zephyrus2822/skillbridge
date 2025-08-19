@@ -19,6 +19,11 @@ export interface ResumeEntry {
   createdAt?: string;
 }
 
+// Custom error type for fetch failures
+interface UploadError extends Error {
+  responseText?: string;
+}
+
 export default function FileUploader({ onParsed }: FileUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -47,10 +52,12 @@ export default function FileUploader({ onParsed }: FileUploaderProps) {
 
       if (!res.ok) {
         const errorText = await res.text();
-        throw new Error(`Failed to upload: ${errorText}`);
+        const uploadError: UploadError = new Error(`Failed to upload: ${errorText}`);
+        uploadError.responseText = errorText;
+        throw uploadError;
       }
 
-      const result = await res.json();
+      const result: { summary: string; feedback?: string } = await res.json();
       console.log('[📦 Upload Response]', result);
 
       const resumeEntry: ResumeEntry = {
@@ -63,9 +70,14 @@ export default function FileUploader({ onParsed }: FileUploaderProps) {
 
       onParsed(resumeEntry);
       setSuccess(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Upload error:', err);
-      setError(err.message || 'Something went wrong while uploading the resume.');
+
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Something went wrong while uploading the resume.');
+      }
     } finally {
       setUploading(false);
     }

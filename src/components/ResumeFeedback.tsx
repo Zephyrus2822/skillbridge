@@ -5,8 +5,10 @@ import { useUser } from '@clerk/nextjs';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+type FeedbackType = string | { content: string };
+
 interface ResumeFeedbackProps {
-  feedback: string;
+  feedback: FeedbackType;
   resumeText: string;
   onRate: (rating: 'up' | 'down') => void;
 }
@@ -18,7 +20,7 @@ export default function ResumeFeedback({
 }: ResumeFeedbackProps) {
   const { user } = useUser();
   const [generatedFeedback, setGeneratedFeedback] = useState<string>(
-    typeof feedback === 'string' ? feedback : (feedback as any)?.content || 'No feedback available.'
+    typeof feedback === 'string' ? feedback : feedback?.content || 'No feedback available.'
   );
   const [loading, setLoading] = useState<boolean>(false);
   const [rated, setRated] = useState<boolean>(false);
