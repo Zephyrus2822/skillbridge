@@ -127,6 +127,18 @@ uvicorn main:app --reload
 * Connect GitHub with `github-creds`
 * Set Jenkins URL and port (default 8081)
 
+### Docker 
+```
+docker compose up --build (Recommended)
+
+If you know what you are doing:
+1. ( in root ) docker build -t skillbridge-frontend -f Dockerfile-frontend .
+2. ( in src/resume_parser ) docker build -t skillbridge-backend -f Dockerfile-backend .
+
+then open two terminals and separately run:
+1. docker run skillbridge-frontend:latest
+2. docker run --env ../../.env -p 8000:8000 skillbridge-backend:latest
+```
 ---
 
 ## 📦 APIs
