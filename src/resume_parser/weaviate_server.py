@@ -1,30 +1,26 @@
 # weaviate_server.py
-import traceback
-from fastapi import APIRouter, HTTPException
 import os
+import re
+import traceback
 from dotenv import load_dotenv
-from weaviate import connect_to_wcs
-from weaviate.auth import AuthApiKey
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+import requests
+
+from weaviate import connect_to_weaviate_cloud as connect_to_wcs
+from weaviate.classes.init import Auth
+from weaviate.classes.config import Configure, Property, DataType
+from weaviate.collections.classes.filters import Filter
+
 from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
-from weaviate.collections.classes.filters import Filter
-from weaviate.classes.config import Configure, Property, DataType
-from weaviate.classes.init import Auth
-import requests
-from fastapi.responses import FileResponse
-from weaviate.collections.classes.filters import Filter
-from pydantic import BaseModel
-import re
-
-
 load_dotenv() # Loads .env file once for everything
 
 router = APIRouter()
 client = None # Initialize Weaviate client as None , this gets updated through backend
 
 # Helper Functions (I am losing my mind its 3.18am here UTC +5.30)
-
-
 def sanitize_filename(s: str) -> str:
     """
     Replace unsafe filename characters (e.g., /, \, :, *, ?, ", <, >, |, and spaces) with underscores.
@@ -120,16 +116,17 @@ def build_feedback_agent():
     prompt = PromptTemplate(
         input_variables=["resume_text"],
         template="""
-You are an expert hiring manager. Given the following resume, analyze it and provide:
+You are an expert technical hiring manager, you have a lot of experience in interviewing candidates and understand how the current tech market works, based on that you are to provide feedback. Given the following resume, analyze it and provide:
 
-1. Concise 5-8 points for improvement  
-2. Key strengths  
-3. Areas for improvement  
-4. Recommended roles based on the profile  
-5. Make improvements on the corporate jargon, language used in the resume. The improved resume must not have any copy-pasted segments from previous resume.
-6. Make sure that the resume generated here is ATS-friendly and can by-pass AI checks.
+1. Concise 5-6 points for improvement  
+2. Core strengths  
+3. Key areas for improvement  
+4. Recommended roles based on the profile (simply suggest 2-3 roles compliant with candidate resume).
+5. Make improvements on the tech corporate jargon, language used in the resume. The improved resume must not have any copy-pasted segments from previous resume.
+6. Make sure that the resume generated here is ATS-friendly and can by-pass AI checks and all the points written in the resume adhere to the Situation-Task-Action-Report + XYZ methodology but do no explicitly mention these terms in the resume, the points themselves should fit the context.
 7. Make sure that the resume is long enough to cover ONE A4 PAGE for candidate's experience from 0 years to 5 years.
 8. 2-3 project ideas aligned with current job trends (2024-2025)
+9. Your output must always be in plain text format. Do not use Markdown but bullet points,italics, headings, or code blocks are allowed. Write clean text lines only, exactly as they should appear in a resume.
 
 Resume:
 {resume_text}
@@ -147,7 +144,7 @@ def get_job_role(job_text: str) -> str:
     prompt = PromptTemplate(
         input_variables=["job_text"],
         template="""
-        You are a job description analyzer. Given the following job description, extract the primary role or position being advertised.
+        You are a professional job description analyzer. Given the following job description, extract the primary role or position being advertised.
         Job description is given as:
         {job_text}
         """
@@ -262,8 +259,10 @@ You're a career assistant. Improve the resume using past resume versions and fee
 {job_text}
 
 Now generate:
-- An improved resume
-- 2–3 project ideas relevant to 2024–25 job trends.
+- An improved resume with proper line breaks.
+- Do not generate markdown, simple text will do but make it formatted.
+- The text resume should have proper emboldening of tech stack names, numbers, etc. and proper italicisation of dates and links. Extract the links from the resume generated and if that is not possible, keep space for them in accurate positions.
+- 2-3 project ideas relevant to last 2 year job trends.
 """
         )
         job_collection = client.collections.get("JobDescription")
@@ -350,8 +349,8 @@ async def rewrite_resume(payload: dict):
 
         # Prompt
         improvement_prompt = PromptTemplate(
-            input_variables=["latest_resume", "past_context", "job_text"],
-            template="""
+    input_variables=["latest_resume", "past_context", "job_text"],
+    template="""
 You're a career assistant. Improve the resume using past resume versions and feedback.
 
 ### Current Resume:
@@ -364,17 +363,24 @@ You're a career assistant. Improve the resume using past resume versions and fee
 {job_text}
 
 ### Instructions:
-Return your output in the following format:
+Provide your output in TWO sections:
 
----MARKDOWN---
-<Markdown resume here>
----ENDMARKDOWN---
+---TEXT---
+A cleaned, ATS-friendly plain text version of the resume.  
+- Use **bold** for tech stacks, numbers, and achievements.  
+- Use *italics* for dates and links.  
+- Ensure this text is human-readable and fits on ONE A4 page.  
+---ENDTEXT---
 
 ---LATEX---
-<LaTeX resume here>
+A LaTeX formatted version of the improved resume (ready to compile).  
+- Use proper LaTeX syntax.  
+- Ensure formatting fits one A4 page.  
+- Do not leave any placeholder commands unresolved.  
 ---ENDLATEX---
 """
-        )
+)
+
 
         # Run agent
         llm = ChatGoogleGenerativeAI(
@@ -402,22 +408,22 @@ Return your output in the following format:
                 print(f"[⚠️ Missing Section] {tag} not found in AI response.")
                 return ""
 
-        markdown_resume = extract_section("markdown")
-        latex_resume = extract_section("latex")
+        # now only TEXT section is expected
+        text_resume = extract_section("TEXT")
 
-        if not markdown_resume or not latex_resume:
-            print("[⚠️ FORMAT WARNING] One or both resume formats are missing.")
+        if not text_resume:
+            print("[⚠️ FORMAT WARNING] Resume text is missing.")
 
         print("[✅ REWRITE DONE]")
         return {
-            "markdown": markdown_resume,
-            "latex": latex_resume
+            "text": text_resume
         }
 
     except Exception as e:
         print("[❌ REWRITE ERROR]", str(e))
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Agent rewrite failed")
+
 
 
 @router.post("/api/store-job-description")
@@ -442,53 +448,43 @@ async def store_job_description(payload: dict):
         raise HTTPException(status_code=500, detail="Failed to store job description")
     
 @router.post("/api/trigger-publish")
-
 async def trigger_publish(payload: TriggerPayload):
     try:
+        # Use default/fallback values if any field is missing
         user_id = payload.userId or "anonymous"
-        job_text = payload.job_text
-        tex_content = payload.texContent
-        print(f"🔍 Received payload: {payload.dict()}")
+        role = "resume"  # fixed role to ensure Jenkins can always run
+        mode = payload.mode or "latex"
+        tex_content = payload.texContent or ""
 
-        role = get_job_role(job_text)
-        print(f"🎯 Inferred Role: {role}")
+        print(f"🚀 Triggering Jenkins pipeline for user: {user_id}, role: {role}")
 
-        # ✅ Save LaTeX file first
-        try:
-            file_path = save_tex_to_file(user_id, role, tex_content)
-        except Exception as e:
-            print(f"[❌ ERROR] Saving LaTeX failed: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to compile LaTeX: {e}")
-
-        # 🔐 Jenkins Config
-        jenkins_url = os.getenv("JENKINS_URL")
-        jenkins_token = os.getenv("JENKINS_TOKEN")
-        jenkins_user = os.getenv("JENKINS_USER", "zephyrus2")
-
-        if not all([jenkins_url, jenkins_user, jenkins_token]):
+        # Jenkins Credentials
+        if not all([JENKINS_URL, JENKINS_USER, JENKINS_TOKEN]):
             raise HTTPException(status_code=500, detail="Missing Jenkins credentials or URL in environment.")
 
         # Jenkins Parameters
         params = {
             "user_id": user_id,
             "role": role,
-            "mode": payload.mode,
+            "mode": mode,
         }
 
-        print(f"🚀 Triggering Jenkins at {jenkins_url} with params: {params}")
-
         res = requests.post(
-            jenkins_url,
+            JENKINS_URL,
             params=params,
-            auth=(jenkins_user, jenkins_token)
+            auth=(JENKINS_USER, JENKINS_TOKEN)
         )
 
         if res.status_code in [200, 201]:
             print("[✅] Jenkins triggered successfully.")
+            # Optionally save LaTeX if provided
+            file_path = None
+            if tex_content:
+                file_path = save_tex_to_file(user_id, role, tex_content)
             return {
                 "success": True,
                 "message": f"✅ Jenkins pipeline triggered for user `{user_id}` and role `{role}`",
-                "file_path": file_path,
+                "file_path": file_path
             }
         else:
             print(f"[❌ Jenkins Error] Status: {res.status_code} - {res.text}")
@@ -497,6 +493,7 @@ async def trigger_publish(payload: TriggerPayload):
     except Exception as e:
         print(f"[❌ PIPELINE TRIGGER ERROR] {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to trigger Jenkins pipeline: {str(e)}")
+
 
 
 @router.get("/get-resume")

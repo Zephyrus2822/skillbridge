@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from weaviate import connect_to_wcs
+from weaviate import connect_to_weaviate_cloud as connect_to_wcs
 from weaviate.auth import AuthApiKey
 
 load_dotenv()

@@ -11,19 +11,15 @@ interface ResumeRewriteProps {
 }
 
 interface RewriteResponse {
-  markdown?: string;
-  latex?: string;
+  text?: string;
   error?: string;
-}
-
-interface CompileLatexResponse {
-  file_path: string;
-  detail?: string;
 }
 
 interface PublishResponse {
   success?: boolean;
   error?: string;
+  message: string;
+  file_path: string;
 }
 
 interface RoleResponse {
@@ -36,7 +32,7 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [jobText, setJobText] = useState('');
-  const [markdownResume, setMarkdownResume] = useState('');
+  const [textResume, setTextResume] = useState('');
   const [latexResume, setLatexResume] = useState('');
   const [userRole, setUserRole] = useState('resume');
 
@@ -56,101 +52,52 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
       const data: RewriteResponse = await res.json();
       if (!res.ok) throw new Error(data.error || 'Rewrite failed');
 
-      setMarkdownResume(data.markdown || '');
-      setLatexResume(data.latex || '');
+      setTextResume(data.text || '');
+      setLatexResume(data.text || ''); // same text used for LaTeX internally
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        console.error('❌ Rewrite failed:', err.message);
-        setError(err.message);
-      } else {
-        console.error('❌ Rewrite failed:', err);
-        setError('Failed to rewrite resume.');
-      }
+      if (err instanceof Error) setError(err.message);
+      else setError('Failed to rewrite resume.');
     } finally {
       setLoading(false);
     }
   };
 
-  const compileLatexAndSave = async () => {
-    if (!latexResume) {
-      alert('⚠️ LaTeX content missing. Please rewrite resume first.');
-      return;
-    }
-
-    try {
-      const res = await fetch('http://localhost:8000/api/compile-latex', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.id || 'anonymous',
-          texContent: latexResume,
-          role: userRole,
-        }),
-      });
-
-      const data: CompileLatexResponse = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to save LaTeX');
-
-      console.log(`[✅ COMPILED LaTeX] Saved at: ${data.file_path}`);
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        console.error('❌ Error saving LaTeX:', err.message);
-        setError(err.message);
-      } else {
-        console.error('❌ Error saving LaTeX:', err);
-        setError('Failed to compile and save LaTeX.');
-      }
-    }
-  };
-
   const handlePublish = async () => {
-    if (!jobText || !latexResume) {
-      alert('⚠️ Please enter job description and rewrite resume first.');
+    if (!latexResume) {
+      alert('⚠️ No LaTeX content available. Please rewrite the resume first.');
       return;
     }
 
     try {
-      await fetch('http://localhost:8000/api/store-job-description', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.id || 'anonymous',
-          jobText,
-        }),
-      });
-
-      await compileLatexAndSave();
+      const payload = {
+        userId: user?.id || 'anonymous',
+        job_text: jobText || "No job description provided",
+        mode: 'latex',
+        texContent: latexResume,
+      };
 
       const res = await fetch('http://localhost:8000/api/trigger-publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.id || 'anonymous',
-          job_text: jobText,
-          mode: 'latex',
-          texContent: latexResume,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data: PublishResponse = await res.json();
+
       if (data.success) {
-        alert('✅ Resume pushed to GitHub via Jenkins!');
+        alert('✅ Jenkins pipeline triggered successfully!');
+        console.log('[✅ Jenkins]', data.message, 'File saved at:', data.file_path);
       } else {
         throw new Error(data.error || 'Pipeline trigger failed');
       }
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        console.error('❌ Publish error:', err.message);
-        alert(`❌ Error publishing: ${err.message}`);
-      } else {
-        console.error('❌ Publish error:', err);
-        alert('❌ Error publishing to GitHub via Jenkins.');
-      }
+      if (err instanceof Error) alert(`❌ Error triggering Jenkins: ${err.message}`);
+      else alert('❌ Unknown error triggering Jenkins.');
     }
   };
 
-  const handleDownloadMarkdown = () => {
-    const blob = new Blob([markdownResume], { type: 'text/markdown' });
+  const handleDownloadText = () => {
+    const blob = new Blob([textResume], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -186,7 +133,7 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
         ✨ AI-Rewritten Resume
       </h2>
 
-      {!markdownResume && !loading && (
+      {!textResume && !loading && (
         <button
           onClick={handleRewrite}
           className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
@@ -198,7 +145,7 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
       {loading && <p className="text-gray-500 mt-4">🤖 Rewriting in progress...</p>}
       {error && <p className="text-red-600 mt-4">❌ {error}</p>}
 
-      {markdownResume && (
+      {textResume && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -206,12 +153,12 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
           className="mt-6"
         >
           <h3 className="text-lg font-semibold text-gray-700 mb-2">
-            📝 Rewritten Markdown
+            📝 Rewritten Resume (Text)
           </h3>
 
-          <pre className="whitespace-pre-wrap bg-gray-100 p-4 rounded-lg border text-sm text-gray-800 overflow-x-auto">
-            {markdownResume}
-          </pre>
+          <div className="prose prose-slate max-w-none bg-gray-50 p-4 rounded-lg border">
+            {textResume}
+          </div>
 
           <div className="mt-6">
             <label className="text-sm font-medium text-gray-600 mb-1 block">
@@ -228,14 +175,14 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
 
           <div className="mt-6 flex flex-wrap gap-4">
             <button
-              onClick={handleDownloadMarkdown}
+              onClick={handleDownloadText}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
             >
               📄 Download as .md
             </button>
 
             <PDFDownloadLink
-              document={<ResumePDF content={markdownResume} />}
+              document={<ResumePDF content={textResume} />}
               fileName="Resume.pdf"
             >
               {({ loading }) =>
