@@ -1,9 +1,22 @@
 // src/app/api/rate-feedback/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
+// Define the shape of the request body
+interface RateFeedbackRequestBody {
+  userId: string;
+  resumeText: string;
+  feedback: string;
+  rating: number; // assuming rating is numeric; change to string if needed
+}
+
+// Standard error interface
+interface ErrorWithMessage extends Error {
+  message: string;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const body: RateFeedbackRequestBody = await req.json();
     const { userId, resumeText, feedback, rating } = body;
 
     const response = await fetch('http://localhost:8000/api/store-feedback', {
@@ -19,12 +32,13 @@ export async function POST(req: NextRequest) {
       throw new Error(err);
     }
 
-    const result = await response.json();
+    const result: { success?: boolean; message?: string } = await response.json();
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('[RATING ERROR]', error.message);
+  } catch (error: unknown) {
+    const err = error as ErrorWithMessage;
+    console.error('[RATING ERROR]', err.message);
     return NextResponse.json(
-      { error: 'Failed to rate feedback', details: error.message },
+      { error: 'Failed to rate feedback', details: err.message },
       { status: 500 }
     );
   }

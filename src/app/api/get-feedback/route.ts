@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Define the shape of the request body
+interface FeedbackRequestBody {
+  userId: string;
+  resumeText: string;
+  feedback?: string;
+  timestamp?: string;
+}
+
+// Define a standard error shape
+interface ErrorWithMessage extends Error {
+  message: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body: FeedbackRequestBody = await request.json();
     const { userId, resumeText, feedback, timestamp } = body;
 
     const response = await fetch("http://localhost:8000/api/get-feedback", {
@@ -16,18 +29,19 @@ export async function POST(request: NextRequest) {
       throw new Error(`Error: ${err}`);
     }
 
-    const data = await response.json();
+    const data: { feedback?: string; text?: string } = await response.json();
 
     return NextResponse.json({
       feedback: data.feedback || data.text || "No feedback generated",
     });
 
-  } catch (error: any) {
-    console.error('[FEEDBACK ERROR]', error.message);
+  } catch (error: unknown) {
+    const err = error as ErrorWithMessage;
+    console.error('[FEEDBACK ERROR]', err.message);
     return NextResponse.json(
       {
         error: 'Failed to fetch feedback',
-        details: error.message,
+        details: err.message,
       },
       {
         status: 501,

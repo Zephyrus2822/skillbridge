@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-
+import Link from 'next/link';
 const features = [
   {
     title: 'AI Resume Optimization',
@@ -33,14 +33,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-[#0f0f1a] via-[#1a0f2a] to-[#0a0a1f] text-white overflow-hidden">
-      {/* Hero Section */}
-      <header className="max-w-7xl mx-auto px-6 py-8 flex justify-between items-center">
-        <h1 className="text-4xl font-extrabold text-white">SkillBridge</h1>
-        <div className="flex gap-4">
-          <Button className="bg-[#ff00ff] hover:bg-[#ff33ff] text-white">Sign Up</Button>
-          <Button variant="outline" className="border-[#33ffdd] text-[#33ffdd] hover:bg-[#33ffdd]/20">Dashboard</Button>
-        </div>
-      </header>
+     
 
       <main className="flex flex-col items-center justify-center text-center max-w-5xl mx-auto px-6 mt-20">
         <motion.h2
@@ -55,8 +48,8 @@ export default function LandingPage() {
           Polish your resume, match with the right jobs, and get AI-powered guidance to land your dream role.
         </p>
         <div className="flex gap-6 justify-center">
-          <Button className="bg-[#33ffdd] h-15 w-55 text-black font-bold text-xl px-6 py-3 hover:bg-violet-500 transition">Get Started</Button>
-          
+          <Button className="bg-[#33ffdd] h-15 w-55 text-black font-bold text-xl px-6 py-3 hover:bg-violet-500 transition"><Link href="/dsahboard">Get Started</Link></Button>
+          <Button className="bg-[#33ffdd] h-15 w-55 text-black font-bold text-xl px-6 py-3 hover:bg-violet-500 transition"><Link href="/documentation">Docs</Link></Button>
         </div>
       </main>
 

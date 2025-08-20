@@ -17,26 +17,35 @@ interface ApiError {
   details?: string;
 }
 
+// Reusable MongoClient cache to avoid multiple connections in serverless env
+let cachedClient: MongoClient | null = null;
+async function getMongoClient(uri: string): Promise<MongoClient> {
+  if (cachedClient) return cachedClient;
+  cachedClient = await MongoClient.connect(uri);
+  return cachedClient;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { resumeId: string } }
-) {
-  const { resumeId } = params;
+  context: { params: { resumeId: string } } // strict typing for Next.js App Router
+): Promise<NextResponse> {
+  const { resumeId } = context.params;
 
+  // Validate resumeId
   if (!resumeId || !ObjectId.isValid(resumeId)) {
     const errorResponse: ApiError = { error: "Invalid or missing resume ID" };
     return NextResponse.json(errorResponse, { status: 400 });
   }
 
   try {
-    const uri = process.env.MONGO_URI ?? "";
-    if (!uri || typeof uri !== "string" || !uri.startsWith("mongodb")) {
+    const uri = process.env.MONGO_URI;
+    if (!uri || !uri.startsWith("mongodb")) {
       console.error("[❌ MONGO ERROR] Invalid or missing MONGO_URI");
       const errorResponse: ApiError = { error: "MongoDB URI not configured" };
       return NextResponse.json(errorResponse, { status: 500 });
     }
 
-    const client = await MongoClient.connect(uri);
+    const client = await getMongoClient(uri);
     const db = client.db("skillbridge");
     const collection = db.collection<Resume>("resumes");
 

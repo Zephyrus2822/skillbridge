@@ -1,0 +1,53 @@
+
+services:
+  # Backend Service (FastAPI)
+  backend:
+    build:
+      context: ./src/resume_parser
+      dockerfile: Dockerfile-backend
+    container_name: skillbridge_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./src/resume_parser:/app
+    restart: unless-stopped
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # Frontend Service (Next.js)
+  frontend:
+    build:
+      context: ./
+      dockerfile: Dockerfile-frontend
+    container_name: skillbridge_frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    command: ["npm", "run", "dev"]
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: skillbridge_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge

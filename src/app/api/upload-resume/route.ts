@@ -1,15 +1,26 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
+// Interface for the parsed resume response (adjust based on FastAPI response)
+interface ParsedResumeResponse {
+  parsedText: string;
+  [key: string]: unknown;
+}
+
+// Standard error interface
+interface ErrorWithMessage extends Error {
+  message: string;
+}
+
 export async function POST(request: Request) {
   try {
     const { userId } = await auth();
-    if(!userId) {
-        return NextResponse.json({error: 'Unauthorized' }, { status: 401 });
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const file = formData.get('file') as File | null;
 
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
@@ -22,15 +33,13 @@ export async function POST(request: Request) {
 
     const form = new FormData();
     form.append('file', blob, file.name);
-
     form.append('userId', userId);
 
-   const fastapiURL = process.env.FASTAPI_RESUME_PARSER_URL || 'http://127.0.0.1:8000/api/parse-resume';
+    const fastapiURL = process.env.FASTAPI_RESUME_PARSER_URL || 'http://127.0.0.1:8000/api/parse-resume';
 
     if (!fastapiURL) {
       return NextResponse.json({ error: 'FastAPI URL not configured' }, { status: 500 });
     }
-
 
     const res = await fetch(fastapiURL, {
       method: 'POST',
@@ -44,16 +53,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const parsed = await res.json();
+    const parsed: ParsedResumeResponse = await res.json();
     return NextResponse.json(parsed);
-  } catch (err: any) {
-    console.error('Resume parse error:', err);
-    console.error('[UPLOAD] Fetch failed:', err);
+
+  } catch (err: unknown) {
+    const error = err as ErrorWithMessage;
+    console.error('Resume parse error:', error);
+    console.error('[UPLOAD] Fetch failed:', error);
 
     return NextResponse.json(
-      { error: 'Internal server error', details: err.message },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
-    )
-    ;
+    );
   }
 }
