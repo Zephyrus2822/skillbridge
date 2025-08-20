@@ -34,7 +34,8 @@ export default function ResumeRewrite({ originalResume }: ResumeRewriteProps) {
   const [jobText, setJobText] = useState('');
   const [textResume, setTextResume] = useState('');
   const [latexResume, setLatexResume] = useState('');
-  const [userRole, setUserRole] = useState('resume'); // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [userRole, setUserRole] = useState('resume'); 
 
   const handleRewrite = async () => {
     setLoading(true);
