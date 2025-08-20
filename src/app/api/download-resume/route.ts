@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MongoClient, ObjectId, WithId, Document } from "mongodb";
 
-// Define the Resume type (extend as per your schema)
+// Resume type
 interface Resume extends Document {
   _id: ObjectId;
   userId: string;
@@ -11,13 +11,11 @@ interface Resume extends Document {
   updatedAt?: Date;
 }
 
-// Define error shape
 interface ApiError {
   error: string;
   details?: string;
 }
 
-// Reusable MongoClient cache to avoid multiple connections in serverless env
 let cachedClient: MongoClient | null = null;
 async function getMongoClient(uri: string): Promise<MongoClient> {
   if (cachedClient) return cachedClient;
@@ -25,13 +23,13 @@ async function getMongoClient(uri: string): Promise<MongoClient> {
   return cachedClient;
 }
 
+// ✅ Correct typing for context
 export async function GET(
   request: NextRequest,
-  context: { params: { resumeId: string } } // strict typing for Next.js App Router
+  { params }: { params: { resumeId: string } }
 ): Promise<NextResponse> {
-  const { resumeId } = context.params;
+  const { resumeId } = params;
 
-  // Validate resumeId
   if (!resumeId || !ObjectId.isValid(resumeId)) {
     const errorResponse: ApiError = { error: "Invalid or missing resume ID" };
     return NextResponse.json(errorResponse, { status: 400 });
