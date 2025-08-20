@@ -2,7 +2,7 @@
 
 SkillBridge is a full-stack, AI-driven resume enhancement platform that empowers users to:
 
-* Upload resumes in PDF format
+* Upload resumes in PDF format!
 * Receive intelligent feedback via a Generative AI agent (Gemini)
 * Paste and store job descriptions for tailoring
 * Automatically rewrite resumes using RAG + RL pipeline
