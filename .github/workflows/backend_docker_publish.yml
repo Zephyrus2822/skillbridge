@@ -34,16 +34,6 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/skillbridge-backend:latest
-
-      # Frontend image
-      - name: Build and push frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile-frontend
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/skillbridge-frontend:latest
-
+        
       - name: Logout from Docker Hub
         run: docker logout
