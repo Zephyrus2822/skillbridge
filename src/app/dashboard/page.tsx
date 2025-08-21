@@ -10,6 +10,8 @@ import ResumeRewrite from '@/components/ResumeRewrite';
 import JobDescriptionUploader from '@/components/JobDescriptionUploader';
 import { motion, AnimatePresence } from 'framer-motion';
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardPage() {
   const { user, isSignedIn } = useUser();
 
