@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build-and-push:
+  build-and-push-frontend:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,10 +24,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-          
+
       # Frontend image
-      - name: Build and push frontend
+      - name: Build and push Next.js 
         uses: docker/build-push-action@v6
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
         with:
           context: .
           file: ./Dockerfile-frontend
