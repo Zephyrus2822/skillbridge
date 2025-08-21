@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
-  const { user, isSignedIn } = useUser();
+  const { user, isLoaded, isSignedIn } = useUser();
 
   const [resumeList, setResumeList] = useState<ResumeEntry[]>([]);
   const [activeResumeId, setActiveResumeId] = useState<string | null>(null);
@@ -23,10 +23,10 @@ export default function DashboardPage() {
   const activeResume = resumeList.find(r => r.id === activeResumeId);
 
   useEffect(() => {
-    if (user) {
+    if (isLoaded && user) {
       console.log('[🔐 USER INFO]', user?.id, isSignedIn);
     }
-  }, [user, isSignedIn]);
+  }, [isLoaded, user, isSignedIn]);
 
   const handleParsed = async (resume: ResumeEntry) => {
     const res = await fetch('http://localhost:8000/api/get-feedback', {
@@ -67,6 +67,33 @@ export default function DashboardPage() {
     setResumeList(updated);
   };
 
+  // 🔹 Handle Clerk loading/auth state
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-gray-400">
+        <motion.div
+          className="animate-pulse text-lg"
+          initial={{ opacity: 0.5 }}
+          animate={{ opacity: 1 }}
+          transition={{ repeat: Infinity, duration: 1 }}
+        >
+          Loading dashboard...
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-xl text-red-400">
+          🚫 You must be signed in to access the dashboard.
+        </p>
+      </div>
+    );
+  }
+
+  // 🔹 Main content (only renders if Clerk is ready & user signed in)
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -82,6 +109,7 @@ export default function DashboardPage() {
         📂 SkillBridge Resume Dashboard
       </motion.h1>
 
+      {/* Upload section */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -100,6 +128,7 @@ export default function DashboardPage() {
         <JobDescriptionUploader />
       </motion.div>
 
+      {/* Feedback */}
       <AnimatePresence>
         {activeResume?.feedback && (
           <motion.div
@@ -119,6 +148,7 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
+      {/* Editor */}
       <AnimatePresence>
         {showEditor && activeResume && (
           <motion.div
@@ -140,6 +170,7 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
+      {/* Rewrite */}
       <AnimatePresence>
         {showRewrite && activeResume && (
           <motion.div
